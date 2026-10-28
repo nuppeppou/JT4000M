@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JT-4000M MIDI Editor</title>
+<style>
+  :root {
+    --bg: #1a1e24;
+    --panel: #252b35;
+    --accent: #f5a623;
+    --text: #e0e6ed;
+    --muted: #8a93a0;
+    --slider: #3d4654;
+    --knob: #f5a623;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 1260px;
+    height: 780px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel);
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px solid #333;
+  }
+  h1 {
+    font-size: 1.3rem;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  select, button {
+    background: #333;
+    color: var(--text);
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  button:hover { background: #444; }
+  button.primary {
+    background: var(--accent);
+    color: #111;
+    font-weight: 600;
+  }
+  button.primary:hover { background: #ffb84d; }
+  .status {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .status.ok { color: #4caf50; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: auto auto auto;
+    gap: 10px;
+    flex: 1;
+    overflow: hidden;
+  }
+  .panel {
+    background: var(--panel);
+    border-radius: 8px;
+    border: 1px solid #333;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .panel h2 {
+    font-size: 0.85rem;
+    color: var(--accent);
+    border-bottom: 1px solid #444;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .param {
+    display: grid;
+    grid-template-columns: 1fr 90px 40px;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+  }
+  .param label {
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: var(--slider);
+    border-radius: 3px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--knob);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .val {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.78rem;
+  }
+  .toggle {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    background: #444;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: 0.15s;
+  }
+  .toggle.on::after { left: 22px; }
+  .span2 { grid-column: span 2; }
+  footer {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>JT-4000M MIDI Editor</h1>
+    <div class="controls">
+      <select id="midiOutSelect"><option value="">MIDI出力を選択...</option></select>
+      <select id="midiCh">
+        <option value="0">Ch 1</option><option value="1">Ch 2</option>
+        <option value="2">Ch 3</option><option value="3">Ch 4</option>
+        <option value="4">Ch 5</option><option value="5">Ch 6</option>
+        <option value="6">Ch 7</option><option value="7">Ch 8</option>
+        <option value="8">Ch 9</option><option value="9">Ch 10</option>
+        <option value="10">Ch 11</option><option value="11">Ch 12</option>
+        <option value="12">Ch 13</option><option value="13">Ch 14</option>
+        <option value="14">Ch 15</option><option value="15">Ch 16</option>
+      </select>
+      <button class="primary" id="connectBtn">MIDI接続</button>
+      <button id="initBtn">Init</button>
+      <button id="randomBtn">Random</button>
+      <span class="status" id="status">未接続</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- GLOBAL -->
+    <div class="panel">
+      <h2>Global</h2>
+      <div class="param" data-cc="1"><label>Modulation</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="param" data-cc="5"><label>Portamento</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+    </div>
+
+    <!-- OSC BALANCE + RING -->
+    <div class="panel">
+      <h2>OSC Balance / Ring</h2>
+      <div class="param" data-cc="29"><label>OSC Balance</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="95"><label>Ring Mod Amount</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="toggle-row">
+        <span>Ring Mod</span>
+        <div class="toggle" id="ringToggle" data-cc="96"></div>
+        <span id="ringLabel">Off</span>
+      </div>
+    </div>
+
+    <!-- OSC 1 -->
+    <div class="panel">
+      <h2>OSC 1</h2>
+      <div class="param" data-cc="24"><label>Waveform</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="param" data-cc="115"><label>Coarse Tune</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="111"><label>Fine Tune</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="113"><label>PWM / SS Detune / FM FB</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+    </div>
+
+    <!-- OSC 2 -->
+    <div class="panel">
+      <h2>OSC 2</h2>
+      <div class="param" data-cc="25"><label>Waveform</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="param" data-cc="116"><label>Coarse Tune</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="112"><label>Fine Tune</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="114"><label>PWM</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+    </div>
+
+    <!-- LFO 1 -->
+    <div class="panel">
+      <h2>LFO 1</h2>
+      <div class="param" data-cc="54"><label>Waveform</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="param" data-cc="72"><label>Rate</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="70"><label>Amount</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="param" data-cc="56"><label>Destination</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+    </div>
+
+    <!-- LFO 2 -->
+    <div class="panel">
+      <h2>LFO 2</h2>
+      <div class="param" data-cc="55"><label>Waveform</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="param" data-cc="73"><label>Rate</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="28"><label>Amount</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+    </div>
+
+    <!-- FILTER -->
+    <div class="panel">
+      <h2>Filter</h2>
+      <div class="param" data-cc="74"><label>Cutoff</label><input type="range" min="0" max="127" value="100"><span class="val">100</span></div>
+      <div class="param" data-cc="71"><label>Resonance</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="param" data-cc="47"><label>Env Amount</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+    </div>
+
+    <!-- FILTER ENV -->
+    <div class="panel">
+      <h2>Filter EG</h2>
+      <div class="param" data-cc="85"><label>Attack</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+      <div class="param" data-cc="86"><label>Decay</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="87"><label>Sustain</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+      <div class="param" data-cc="88"><label>Release</label><input type="range" min="0" max="127" value="32"><span class="val">32</span></div>
+    </div>
+
+    <!-- AMP ENV -->
+    <div class="panel span2">
+      <h2>Amp EG (VCA)</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;">
+        <div class="param" data-cc="81"><label>Attack</label><input type="range" min="0" max="127" value="0"><span class="val">0</span></div>
+        <div class="param" data-cc="82"><label>Decay</label><input type="range" min="0" max="127" value="64"><span class="val">64</span></div>
+        <div class="param" data-cc="83"><label>Sustain</label><input type="range" min="0" max="127" value="100"><span class="val">100</span></div>
+        <div class="param" data-cc="84"><label>Release</label><input type="range" min="0" max="127" value="32"><span class="val">32</span></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    JT-4000M MICRO MIDI Editor · マニュアル MIDI Implementation Chart 準拠 · Web MIDI API 使用 · 自己責任でご利用ください
+  </footer>
+</div>
+
+<script>
+let midiAccess = null;
+let midiOut = null;
+let channel = 0;
+
+const statusEl = document.getElementById('status');
+const selectEl = document.getElementById('midiOutSelect');
+const chEl = document.getElementById('midiCh');
+
+function sendCC(cc, value) {
+  if (!midiOut) return;
+  const status = 0xB0 | channel;
+  midiOut.send([status, cc, value & 0x7F]);
+}
+
+function updateVal(el) {
+  const valSpan = el.parentElement.querySelector('.val');
+  if (valSpan) valSpan.textContent = el.value;
+}
+
+// スライダー初期化
+document.querySelectorAll('.param input[type=range]').forEach(slider => {
+  const cc = parseInt(slider.parentElement.dataset.cc);
+  slider.addEventListener('input', () => {
+    updateVal(slider);
+    sendCC(cc, parseInt(slider.value));
+  });
+});
+
+// Ring Mod トグル
+const ringToggle = document.getElementById('ringToggle');
+const ringLabel = document.getElementById('ringLabel');
+let ringOn = false;
+ringToggle.addEventListener('click', () => {
+  ringOn = !ringOn;
+  ringToggle.classList.toggle('on', ringOn);
+  ringLabel.textContent = ringOn ? 'On' : 'Off';
+  sendCC(96, ringOn ? 127 : 0);
+});
+
+// MIDI 接続
+document.getElementById('connectBtn').addEventListener('click', async () => {
+  if (!navigator.requestMIDIAccess) {
+    statusEl.textContent = 'Web MIDI 非対応ブラウザです';
+    return;
+  }
+  try {
+    midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+    populateOutputs();
+    midiAccess.onstatechange = populateOutputs;
+    statusEl.textContent = '接続準備完了';
+    statusEl.classList.add('ok');
+  } catch (e) {
+    statusEl.textContent = 'MIDI アクセス拒否: ' + e.message;
+  }
+});
+
+function populateOutputs() {
+  selectEl.innerHTML = '<option value="">MIDI出力を選択...</option>';
+  if (!midiAccess) return;
+  for (const out of midiAccess.outputs.values()) {
+    const opt = document.createElement('option');
+    opt.value = out.id;
+    opt.textContent = out.name;
+    selectEl.appendChild(opt);
+  }
+}
+
+selectEl.addEventListener('change', () => {
+  const id = selectEl.value;
+  midiOut = id ? midiAccess.outputs.get(id) : null;
+  statusEl.textContent = midiOut ? `出力: ${midiOut.name}` : '未選択';
+  statusEl.classList.toggle('ok', !!midiOut);
+});
+
+chEl.addEventListener('change', () => {
+  channel = parseInt(chEl.value);
+});
+
+// Init
+document.getElementById('initBtn').addEventListener('click', () => {
+  const defaults = {
+    1:0, 5:0, 24:0, 25:0, 28:0, 29:64, 47:64, 54:0, 55:0, 56:0,
+    70:0, 71:0, 72:64, 73:64, 74:100, 81:0, 82:64, 83:100, 84:32,
+    85:0, 86:64, 87:64, 88:32, 95:0, 96:0,
+    111:64, 112:64, 113:0, 114:0, 115:64, 116:64
+  };
+  document.querySelectorAll('.param').forEach(p => {
+    const cc = parseInt(p.dataset.cc);
+    const sl = p.querySelector('input');
+    if (sl && defaults[cc] !== undefined) {
+      sl.value = defaults[cc];
+      updateVal(sl);
+      sendCC(cc, defaults[cc]);
+    }
+  });
+  ringOn = false;
+  ringToggle.classList.remove('on');
+  ringLabel.textContent = 'Off';
+  sendCC(96, 0);
+});
+
+// Random
+document.getElementById('randomBtn').addEventListener('click', () => {
+  document.querySelectorAll('.param input[type=range]').forEach(sl => {
+    const v = Math.floor(Math.random() * 128);
+    sl.value = v;
+    updateVal(sl);
+    sendCC(parseInt(sl.parentElement.dataset.cc), v);
+  });
+  ringOn = Math.random() > 0.5;
+  ringToggle.classList.toggle('on', ringOn);
+  ringLabel.textContent = ringOn ? 'On' : 'Off';
+  sendCC(96, ringOn ? 127 : 0);
+});
+</script>
+</body>
+</html>
